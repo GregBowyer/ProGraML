@@ -21,6 +21,25 @@ load(
     "python_proto_library",
 )
 
+exports_pip(
+    name = "export_pip",
+    package_name = "programl_protos",
+    classifiers = [
+        "Development Status :: 4 - Beta",
+        "Environment :: Console",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+    ],
+    description = "Protocol buffers for ProGraML",
+    keywords = ["programl"],
+    license = "Apache License, Version 2.0",
+    long_description_file = "//:README.md",
+    package_root = "//programl/proto",
+)
+
 proto_library(
     name = "checkpoint",
     srcs = ["checkpoint.proto"],
