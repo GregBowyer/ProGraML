@@ -26,6 +26,7 @@
 #include "labm8/cpp/string.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "programl/graph/program_graph_builder.h"
@@ -74,6 +75,10 @@ class ProgramGraphBuilder : public programl::graph::ProgramGraphBuilder {
 
   void Clear();
 
+  // Return the node representing a type. If no node already exists for this type, a new node is
+  // created and added to the graph.
+  Node* GetOrCreateType(const ::llvm::Type* type);
+
  protected:
   [[nodiscard]] labm8::StatusOr<FunctionEntryExits> VisitFunction(
       const ::llvm::Function& function, const Function* functionMessage);
@@ -93,6 +98,14 @@ class ProgramGraphBuilder : public programl::graph::ProgramGraphBuilder {
   Node* AddLlvmVariable(const ::llvm::Argument* argument,
                         const Function* function);
   Node* AddLlvmConstant(const ::llvm::Constant* constant);
+  Node* AddLlvmType(const ::llvm::Type* type);
+
+  Node* AddLlvmType(const ::llvm::StructType* type);
+  Node* AddLlvmType(const ::llvm::PointerType* type);
+  // TODO: Node* AddLlvmType(const ::llvm::IntegerType* type);
+  Node* AddLlvmType(const ::llvm::FunctionType* type);
+  Node* AddLlvmType(const ::llvm::ArrayType* type);
+  Node* AddLlvmType(const ::llvm::VectorType* type);
 
  private:
   const ProgramGraphOptions options_;
@@ -110,6 +123,8 @@ class ProgramGraphBuilder : public programl::graph::ProgramGraphBuilder {
   // visited.
   absl::flat_hash_map<const ::llvm::Constant*, std::vector<PositionalNode>>
       constants_;
+  // A map from an LLVM type to the node message that represents it.
+  absl::flat_hash_map<const ::llvm::Type*, Node*> types_;
 };
 
 }  // namespace internal

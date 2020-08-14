@@ -195,26 +195,29 @@ labm8::Status SerializeGraphVizToString(const ProgramGraph& graph,
 
     // Set the node shape.
     switch (node.type()) {
+      attributes["style"] = "filled";
       case Node::INSTRUCTION:
         attributes["shape"] = "box";
-        attributes["style"] = "filled";
         attributes["fillcolor"] = "#3c78d8";
         attributes["fontcolor"] = "#ffffff";
         break;
       case Node::VARIABLE:
         attributes["shape"] = "ellipse";
-        attributes["style"] = "filled";
         attributes["fillcolor"] = "#f4cccc";
         attributes["color"] = "#990000";
         attributes["fontcolor"] = "#990000";
         break;
       case Node::CONSTANT:
-        attributes["shape"] = "diamond";
-        attributes["style"] = "filled";
+        attributes["shape"] = "octagon";
         attributes["fillcolor"] = "#e99c9c";
         attributes["color"] = "#990000";
         attributes["fontcolor"] = "#990000";
         break;
+      case Node::TYPE:
+        attributes["shape"] = "diamond";
+        attributes["fillcolor"] = "#cccccc";
+        attributes["color"] = "#cccccc";
+        attributes["fontcolor"] = "#222222";
     }
   }
 
@@ -240,8 +243,11 @@ labm8::Status SerializeGraphVizToString(const ProgramGraph& graph,
         break;
       case Edge::CALL:
         attributes["color"] = "#65ae4d";
-        attributes["weight"] = "1";
+        attributes["weight"] = "1";  // TODO: Consider 0
         break;
+      case Edge::TYPE:
+        attributes["color"] = "#aaaaaa";
+        attributes["weight"] = "0";
     }
 
     // Set the edge label.

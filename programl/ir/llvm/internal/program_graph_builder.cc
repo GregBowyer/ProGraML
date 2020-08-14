@@ -31,6 +31,7 @@
 #include "programl/graph/features.h"
 #include "programl/ir/llvm/internal/text_encoder.h"
 #include "programl/proto/program_graph.pb.h"
+#include "program_graph_builder.h"
 
 using labm8::Status;
 
@@ -38,6 +39,11 @@ namespace programl {
 namespace ir {
 namespace llvm {
 namespace internal {
+
+template<typename T>
+void AddFullTextFeature(T* element, const std::string& fullText) {
+  graph::AddScalarFeature(element, "full_text", fullText);
+}
 
 labm8::StatusOr<BasicBlockEntryExit> ProgramGraphBuilder::VisitBasicBlock(
     const ::llvm::BasicBlock& block, const Function* functionMessage,
@@ -194,7 +200,7 @@ labm8::StatusOr<FunctionEntryExits> ProgramGraphBuilder::VisitFunction(
 
   if (function.isDeclaration()) {
     Node* node = AddInstruction("; undefined function", functionMessage);
-    graph::AddScalarFeature(node, "full_text", "");
+    AddFullTextFeature(node, "");
     functionEntryExits.first = node;
     functionEntryExits.second.push_back(node);
     return functionEntryExits;
@@ -325,7 +331,7 @@ Node* ProgramGraphBuilder::AddLlvmInstruction(
   const LlvmTextComponents text = textEncoder_.Encode(instruction);
   Node* node = AddInstruction(text.opcode_name, function);
   node->set_block(blockCount_);
-  graph::AddScalarFeature(node, "full_text", text.text);
+  AddFullTextFeature(node, text.text);
 
   // Add profiling information features, if available.
   uint64_t profTotalWeight;
@@ -345,29 +351,88 @@ Node* ProgramGraphBuilder::AddLlvmInstruction(
 Node* ProgramGraphBuilder::AddLlvmVariable(const ::llvm::Instruction* operand,
                                            const programl::Function* function) {
   const LlvmTextComponents text = textEncoder_.Encode(operand);
-  Node* node = AddVariable(text.lhs_type, function);
+  Node* node = AddVariable("var", function);
   node->set_block(blockCount_);
-  graph::AddScalarFeature(node, "full_text", text.lhs);
-
+  AddFullTextFeature(node, text.lhs);
   return node;
 }
 
 Node* ProgramGraphBuilder::AddLlvmVariable(const ::llvm::Argument* argument,
                                            const programl::Function* function) {
   const LlvmTextComponents text = textEncoder_.Encode(argument);
-  Node* node = AddVariable(text.lhs_type, function);
+  Node* node = AddVariable("var", function);
   node->set_block(blockCount_);
-  graph::AddScalarFeature(node, "full_text", text.lhs);
+  AddFullTextFeature(node, text.lhs);
+
+  Node* type = GetOrCreateType(operand->getType());
+  AddTypeEdge(/*position=*/0, type, node);
 
   return node;
 }
 
 Node* ProgramGraphBuilder::AddLlvmConstant(const ::llvm::Constant* constant) {
   const LlvmTextComponents text = textEncoder_.Encode(constant);
-  Node* node = AddConstant(text.lhs_type);
+  Node* node = AddConstant("const");
   node->set_block(blockCount_);
-  graph::AddScalarFeature(node, "full_text", text.text);
+  AddFullTextFeature(node, text.text);
 
+  Node* type = GetOrCreateType(operand->getType());
+  AddTypeEdge(/*position=*/0, type, node);
+  return node;
+}
+
+Node* ProgramGraphBuilder::AddLlvmType(const ::llvm::Type* type) {
+  const LlvmTextComponents text = textEncoder_.Encode(constant);
+  Node* node = AddType(text.ls_type);
+  AddFullTextFeature(node, text.lhs);
+  return node;
+}
+
+Node* ProgramGraphBuilder::AddLlvmType(const ::llvm::StructType* type) {
+  Node* node = AddType("struct");
+  AddFullTextFeature(node, type->hasName() ? type->getName() : "struct");
+
+  // Add types for the struct elements, and type edges.
+  for (int i = 0; i < type->getNumElements(); ++i) {
+    const auto& member = type->elements()[i];
+    // Re-use the type if it already exists to prevent duplication of member types.
+    auto memberNode = GetOrCreateType(member);
+    AddTypeEdge(/*position=*/i, memberNode, node);
+  }
+
+  return node;
+}
+
+Node* ProgramGraphBuilder::AddLlvmType(const ::llvm::PointerType* type) {
+  Node* node = AddType("*");
+  AddFullTextFeature(node, textEncoder_.Encode(constant).lhs);
+  // Re-use the type if it already exists to prevent duplication of element types.
+  auto elementType = GetOrCreateType(type->getElementType());
+  AddTypeEdge(/*position=*/0,, elementType, node);
+  return node;
+}
+
+Node* ProgramGraphBuilder::AddLlvmType(const ::llvm::FunctionType* type) {
+  Node* node = AddType("fn");
+  AddFullTextFeature(node, textEncoder_.Encode(constant).lhs);
+  return node;
+}
+
+Node* ProgramGraphBuilder::AddLlvmType(const ::llvm::ArrayType* type) {
+  Node* node = AddType("[]");
+  AddFullTextFeature(node, textEncoder_.Encode(constant).lhs);
+  // Re-use the type if it already exists to prevent duplication of element types.
+  auto elementType = GetOrCreateType(type->getElementType());
+  AddTypeEdge(/*position=*/0, elementType, node);
+  return node;
+}
+
+Node* ProgramGraphBuilder::AddLlvmType(const ::llvm::VectorType* type) {
+  Node* node = AddType("vector");
+  AddFullTextFeature(node, textEncoder_.Encode(constant).lhs);
+  // Re-use the type if it already exists to prevent duplication of element types.
+  auto elementType = GetOrCreateType(type->getElementType());
+  AddTypeEdge(/*position=*/0, elementType, node);
   return node;
 }
 
@@ -463,6 +528,16 @@ void ProgramGraphBuilder::Clear() {
   blockCount_ = 0;
   callSites_.clear();
   programl::graph::ProgramGraphBuilder::Clear();
+}
+
+Node* ProgramGraphBuilder::GetOrCreateType(const ::llvm::Type* type) {
+  auto it = types_.find(type);
+  if (it == types_.end()) {
+    Node* node = AddLlvmType(type);
+    types_[type] = node;
+    return node;
+  }
+  return it->second;
 }
 
 }  // namespace internal

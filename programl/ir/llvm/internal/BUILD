@@ -48,6 +48,16 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "program_graph_builder_test",
+    srcs = ["program_graph_builder_test.cc"],
+    deps = [
+        ":program_graph_builder",
+        "//programl/proto:program_graph_options_cc",
+        "@llvm//10.0.0",
+    ],
+)
+
 cc_library(
     name = "program_graph_builder_pass",
     srcs = ["program_graph_builder_pass.cc"],
